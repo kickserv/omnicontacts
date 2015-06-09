@@ -41,8 +41,9 @@ module OmniContacts
           # creating nil fields to keep the fields consistent across other networks
           contact = {:id => nil, :first_name => nil, :last_name => nil, :name => nil, :email => nil, :gender => nil, :birthday => nil, :profile_picture=> nil, :relation => nil, :email_hashes => []}
           contact[:id] = entry['user_id'] ? entry['user_id'] : entry['id']
+          contact[:email] = entry['emails']['preferred'] if entry['emails']
           if valid_email? entry["name"]
-            contact[:email] = entry["name"]
+            contact[:email] ||= entry["name"]
             contact[:first_name], contact[:last_name], contact[:name] = email_to_name(contact[:email])
           else
             contact[:first_name] = normalize_name(entry['first_name'])
@@ -53,6 +54,32 @@ module OmniContacts
           contact[:gender] = entry['gender']
           contact[:profile_picture] = image_url(entry['user_id'])
           contact[:email_hashes] = entry['email_hashes']
+
+          contact[:emails] = []
+          entry['emails'].each_pair do |label, value|
+            next unless value
+            contact[:emails] << {:name => label, :email => value}
+          end if entry['emails']
+
+          contact[:addresses] = []
+          entry['addresses'].each_pair do |label, address|
+            new_address = {:name => label}
+
+            new_address[:address_1] = address['street'] if address['street']
+            if new_address[:address_1].index("\n")
+              parts = new_address[:address_1].split("\n")
+              new_address[:address_1] = parts.first
+              # this may contain city/state/zip if user jammed it all into one string.... :-(
+              new_address[:address_2] = parts[1..-1].join(', ')
+            end
+            new_address[:address_2] ||= address['street_2'] if address['street_2']
+            new_address[:city] = address['city'] if address['city']
+            new_address[:region] = address['state'] if address['state'] # like state or province
+            new_address[:country] = address['region'] if address['region']
+            new_address[:postcode] = address['postal_code'] if address['postal_code']
+            contact[:addresses] << new_address
+          end if entry['addresses']
+
           contacts << contact if contact[:name] || contact[:first_name]
         end
         contacts
