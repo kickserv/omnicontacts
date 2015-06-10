@@ -3,7 +3,7 @@ require "omnicontacts/middleware/base_oauth"
 
 # This class is an OAuth 1.0 Rack middleware.
 #
-# Extending classes are required to 
+# Extending classes are required to
 # implement the following methods:
 # * fetch_token_from_token_and_verifier -> this method has to
 #   fetch the list of contacts from the authorization server.
@@ -18,14 +18,16 @@ module OmniContacts
         super app, options
         @consumer_key = consumer_key
         @consumer_secret = consumer_secret
+        @redirect_host = options[:redirect_host]
         @callback_path = options[:callback_path] || "#{ MOUNT_PATH }#{class_name}/callback"
         @token_prop_name = "#{base_prop_name}.oauth_token"
       end
 
       def callback
-        host_url_from_rack_env(@env) + callback_path
+        host = @redirect_host ? @redirect_host : host_url_from_rack_env(@env)
+        host + callback_path
       end
-
+      
       alias :redirect_path :callback_path
 
       # Obtains an authorization token from the server,
@@ -48,7 +50,7 @@ module OmniContacts
         [302, {"Content-Type" => "application/x-www-form-urlencoded", "location" => target_url}, []]
       end
 
-      # Parses the authorization token from the query string and 
+      # Parses the authorization token from the query string and
       # obtain the relative secret from the session.
       # Finally it calls fetch_contacts_from_token_and_verifier.
       # If token is found in the query string an AuhorizationError
