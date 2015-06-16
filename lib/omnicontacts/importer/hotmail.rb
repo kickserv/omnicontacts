@@ -37,9 +37,25 @@ module OmniContacts
       def contacts_from_response response_as_json
         response = JSON.parse(response_as_json)
         contacts = []
+        pp response
         response['data'].each do |entry|
           # creating nil fields to keep the fields consistent across other networks
-          contact = {:id => nil, :first_name => nil, :last_name => nil, :name => nil, :email => nil, :gender => nil, :birthday => nil, :profile_picture=> nil, :relation => nil, :email_hashes => []}
+          contact = { :id => nil,
+                      :first_name => nil,
+                      :last_name => nil,
+                      :name => nil,
+                      :email => nil,
+                      :gender => nil,
+                      :birthday => nil,
+                      :profile_picture=> nil,
+                      :relation => nil,
+                      :addresses => nil,
+                      :phone_numbers => nil,
+                      :emails => nil,
+                      :email_hashes => [],
+                      :company => nil,
+                      :position => nil
+                    }
           contact[:id] = entry['user_id'] ? entry['user_id'] : entry['id']
           contact[:email] = entry['emails']['preferred'] if entry['emails']
           if valid_email? entry["name"]
@@ -60,6 +76,12 @@ module OmniContacts
             next unless value
             contact[:emails] << {:name => label, :email => value}
           end if entry['emails']
+
+          contact[:phone_numbers] = []
+          entry['phones'].each_pair do |label, value|
+            next unless value
+            contact[:phone_numbers] << {:name => label, :number => value}
+          end if entry['phones']
 
           contact[:addresses] = []
           entry['addresses'].each_pair do |label, address|
