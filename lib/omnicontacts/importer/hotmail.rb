@@ -28,7 +28,7 @@ module OmniContacts
 
       def fetch_current_user access_token
         self_response =  https_get(@contacts_host, @self_path, :access_token => access_token)
-        user = current_user self_response
+        user = current_user(self_response, access_token)
         set_current_user user
       end
 
@@ -37,7 +37,6 @@ module OmniContacts
       def contacts_from_response response_as_json
         response = JSON.parse(response_as_json)
         contacts = []
-        pp response
         response['data'].each do |entry|
           # creating nil fields to keep the fields consistent across other networks
           contact = { :id => nil,
@@ -112,13 +111,14 @@ module OmniContacts
         emails['account']
       end
 
-      def current_user me
+      def current_user(me, access_token)
         return nil if me.nil?
         me = JSON.parse(me)
         email = parse_email(me['emails'])
         user = {:id => me['id'], :email => email, :name => me['name'], :first_name => me['first_name'],
                 :last_name => me['last_name'], :gender => me['gender'], :profile_picture => image_url(me['id']),
-                :birthday => birthday_format(me['birth_month'], me['birth_day'], me['birth_year'])
+                :birthday => birthday_format(me['birth_month'], me['birth_day'], me['birth_year']),
+                :access_token => access_token
         }
         user
       end
