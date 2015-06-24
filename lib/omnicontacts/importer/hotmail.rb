@@ -87,7 +87,7 @@ module OmniContacts
             new_address = {:name => label}
 
             new_address[:address_1] = address['street'] if address['street']
-            if new_address[:address_1].index("\n")
+            if new_address[:address_1] && new_address[:address_1].index("\n")
               parts = new_address[:address_1].split("\n")
               new_address[:address_1] = parts.first
               # this may contain city/state/zip if user jammed it all into one string.... :-(
