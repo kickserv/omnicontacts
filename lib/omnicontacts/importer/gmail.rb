@@ -13,18 +13,18 @@ module OmniContacts
         @auth_host = "accounts.google.com"
         @authorize_path = "/o/oauth2/auth"
         @auth_token_path = "/o/oauth2/token"
-        @scope = (args[3] && args[3][:scope]) || "https://www.google.com/m8/feeds https://www.googleapis.com/auth/userinfo#email https://www.googleapis.com/auth/userinfo.profile"
+        @scope = (args[3] && args[3][:scope]) || "https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/userinfo#email https://www.googleapis.com/auth/userinfo.profile"
         @contacts_host = "www.google.com"
         @contacts_path = "/m8/feeds/contacts/default/full"
         @max_results =  (args[3] && args[3][:max_results]) || 100
         @self_host = "www.googleapis.com"
-        @profile_path = "/oauth2/v1/userinfo"
+        @profile_path = "/oauth2/v3/userinfo"
       end
 
       def fetch_contacts_using_access_token access_token, token_type
         fetch_current_user(access_token, token_type)
         contacts_response = https_get(@contacts_host, @contacts_path, contacts_req_params, contacts_req_headers(access_token, token_type))
-        contacts_from_response contacts_response
+        contacts_from_response(contacts_response, access_token)
       end
 
       def fetch_current_user access_token, token_type
@@ -43,7 +43,7 @@ module OmniContacts
         {"GData-Version" => "3.0", "Authorization" => "#{token_type} #{token}"}
       end
 
-      def contacts_from_response response_as_json
+      def contacts_from_response(response_as_json, access_token)
         response = JSON.parse(response_as_json)
 
         return [] if response['feed'].nil? || response['feed']['entry'].nil?
@@ -115,7 +115,7 @@ module OmniContacts
 
             new_address[:address_1] = address['gd$street']['$t'] if address['gd$street']
             new_address[:address_1] = address['gd$formattedAddress']['$t'] if new_address[:address_1].nil? && address['gd$formattedAddress']
-            if new_address[:address_1].index("\n")
+            if !new_address[:address_1].nil? && new_address[:address_1].index("\n")
               parts = new_address[:address_1].split("\n")
               new_address[:address_1] = parts.first
               # this may contain city/state/zip if user jammed it all into one string.... :-(
@@ -151,11 +151,13 @@ module OmniContacts
           # Support older versions of the gem by keeping singular entries around
           contact[:phone_number] = contact[:phone_numbers][0][:number] if contact[:phone_numbers][0]
 
-          if entry['gContact$website'] && entry['gContact$website'][0]["rel"] == "profile"
-            contact[:id] = contact_id(entry['gContact$website'][0]["href"])
-            contact[:profile_picture] = image_url(contact[:id])
-          else
-            contact[:profile_picture] = image_url_from_email(contact[:email])
+          if entry["link"] && entry["link"].is_a?(Array)
+            entry["link"].each do |link|
+              if link["type"] == 'image/*' && link["gd$etag"]
+                contact[:profile_picture] = link["href"] + "?&access_token=" + access_token
+                break
+              end
+            end
           end
 
           if entry['gContact$event']
@@ -180,15 +182,11 @@ module OmniContacts
         contacts
       end
 
-      def image_url gmail_id
-        return "https://profiles.google.com/s2/photos/profile/" + gmail_id if gmail_id
-      end
-
       def current_user me, access_token, token_type
         return nil if me.nil?
         me = JSON.parse(me)
         user = {:id => me['id'], :email => me['email'], :name => me['name'], :first_name => me['given_name'],
-                :last_name => me['family_name'], :gender => me['gender'], :birthday => birthday(me['birthday']), :profile_picture => image_url(me['id']),
+                :last_name => me['family_name'], :gender => me['gender'], :birthday => birthday(me['birthday']), :profile_picture => me["picture"],
                 :access_token => access_token, :token_type => token_type
         }
         user
